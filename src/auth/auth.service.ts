@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, InternalServerErrorException, UnsupportedMediaTypeException } from "@nestjs/common";
+import { BadRequestException, Injectable, InternalServerErrorException, UnauthorizedException, UnsupportedMediaTypeException } from "@nestjs/common";
 
 import { InjectModel } from "@nestjs/mongoose";
 import { User } from "./entities/user.entity";
@@ -47,12 +47,19 @@ export class AuthService {
     const { email, password } = loginDto;
     const userLogin = await this.userModel.findOne({ email: email });
 
-    if (!userLogin) throw new Error("no pasda nada");
+    if (!userLogin) {
+      throw new UnauthorizedException('Not valid credentials - email');
+    }
+    // throw new Error("no pasda nada");
 
     // console.log(password);
     // console.log(userLogin.password);
     // console.log(bcrypt.hashSync(password, 10));
-    if (!bcrypt.compareSync(password, userLogin.password)) throw new Error("el password fallo");
+    if (!bcrypt.compareSync(password, userLogin.password)) {
+      throw new UnauthorizedException('Not valid credentials - password');
+    }
+      
+      // throw new Error("el password fallo");
     const { password: _, ...userR } = userLogin.toJSON();
     // return { ...userR, token: "a123" };
     return {
@@ -73,6 +80,11 @@ export class AuthService {
     return this.userModel.find();
   }
 
+  async findUnserById(id: string) {
+    const user = await this.userModel.findById(id);
+    const { password, ...rest } = user.toJSON();
+    return rest;
+  }
   findOne(id: number) {
     return this.userModel.findById(id);
   }

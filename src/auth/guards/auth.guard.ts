@@ -1,17 +1,34 @@
-import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Observable } from "rxjs";
 import * as request from "supertest";
+import { AuthService } from "../auth.service";
+import { JwtPayload } from "../interfaces/jwt-payload";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private jwtService: JwtService) {}
-  canActivate(context: ExecutionContext): Promise<boolean> {
+  constructor(
+    private jwtService: JwtService,
+    private authService: AuthService,
+  ) {}
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const token = this.extractTokenFromHeader(request);
+    if (!token) {
+      throw new UnauthorizedException("there is not bearer token");
+    }
+    try {
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token, { secret: process.env.JWT_SEED });
+      const user = await this.authService.findUnserById(payload.id);
+      if (!user) throw new UnauthorizedException("user doest not existst");
+      if (!user.isActive) throw new UnauthorizedException("user doest not active");
+      // console.log({ payload });
+      request["user"] = user;
+    } catch (error) {
+      throw new UnauthorizedException();
+    }
 
-    console.log({token});
-    return Promise.resolve(true);
+    return true;
   }
   private extractTokenFromHeader(request: Request): string | undefined {
     const [type, token] = request.headers["authorization"]?.split(" ") ?? [];
